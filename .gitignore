@@ -1,0 +1,11 @@
+__pycache__/*
+rawTexts/greek/perseus_texts/*
+rawTexts/english/Gutenberg/*
+rawTexts/english/ShakespearePlaysPlus/*
+rawTexts/english/ME/*
+rawTexts/icelandic/textar/*
+rawTexts/icelandic/icepahc-v0.9/*
+rawTexts/icelandic/MIM/*
+texts/*/*
+output/*
+**/.DS_Store
