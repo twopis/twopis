@@ -674,7 +674,8 @@ def removePunctGutenberg(text, debugString):
     #     print("<{%s~~%s~~%s}>" % (m.group(1), m.group(2), m.group(3)))
     #     #print("<{%s}>" % (m.group(0)))
 
-    text = re.sub(r'[^A-Za-z\-\&\s]+', ' ', text)
+    text = re.sub(r'[^A-Za-z\-\&\s\']+', ' ', text)
+    text = re.sub(r' \'', ' ', text)
     text = re.sub(r'\s+', ' ', text)
     text = text.lower()
     return text
@@ -701,7 +702,8 @@ def removePunctShakespeare(text, debugString):
     #     print("<{%s~~%s~~%s}>" % (m.group(1), m.group(2), m.group(3)))
     #     #print("<{%s}>" % (m.group(0)))
 
-    text = re.sub(r'[^A-Za-z\-\&\s]+', ' ', text)
+    text = re.sub(r'[^A-Za-z\-\&\s\']+', ' ', text)
+    text = re.sub(r' \'', ' ', text)
     text = re.sub(r'\s+', ' ', text)
     text = text.lower()
     return text
@@ -726,7 +728,8 @@ def removePunctME(text, debugString):
     #     print("<{%s~~%s~~%s}>" % (m.group(1), m.group(2), m.group(3)))
     #     #print("<{%s}>" % (m.group(0)))
 
-    text = re.sub(r'[^A-Za-z\-\s]+', ' ', text)
+    text = re.sub(r'[^A-Za-z\-\s\']+', ' ', text)
+    text = re.sub(r' \'', ' ', text)
     text = re.sub(r'\s+', ' ', text)
     text = text.lower()
     return text

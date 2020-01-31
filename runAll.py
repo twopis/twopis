@@ -4,14 +4,14 @@ import subprocess
 import random
 import numpy as np
 
-from getWordCounts import getWordCounts
+from getWordCounts import getWordCountInfo, getWordCounts
+from calcTopWordOverlap import calcTopWordOverlapOverTime
 from calcSimilarity import calculateSimilarity
 from groupWords import groupWords
-from makeBasicGraphs import basicGraphs, normalizedGraphs
+from makeBasicGraphs import basicGraphs
 from predictCategories import predictCategories
 from printKeyWords import printKeyWords
-from metricCapture import metricCapture
-from gatherFiles import gatherFiles, gatherFilesFull
+from gatherFiles import gatherFilesFull
 from wordGroupTests import wordGroupTests
 import mainParams as mp
 
@@ -20,6 +20,14 @@ for language in ["Greek", "English", "Icelandic"]:
     print("Language: %s" % language)
     textLocation = mp.languageInfo[language]["textLocation"]
     tops = mp.languageInfo[language]["tops"]
+
+    # Precomputation to save computing time: since all currently used options
+    # have a subsetSize and splitParamter of -1, we can calculate this info once
+    # and use it many times.
+    authors, books, tokenInfo, poetryTokenInfo = getWordCountInfo(-1, -1, language)
+
+    print("Getting top word overlap over time info...")
+    calcTopWordOverlapOverTime(language)
 
     for top in tops:
         # Set random seed for deterministic behavior
@@ -33,11 +41,11 @@ for language in ["Greek", "English", "Icelandic"]:
         saveDir = mp.getSaveDir(language, mp.languageInfo, splitParameter)
 
         print("  Getting word counts...")
-        getWordCounts(splitParameter, newTop, subsetSize, textLocation, language, mp.addPoetry, saveDir)
+        getWordCounts(authors, books, tokenInfo, poetryTokenInfo, newTop, language, saveDir)
         print("====================================")
         print("====================================")
         print("  Calculating similarities...")
-        calculateSimilarity(splitParameter, newTop, subsetSize, compSimOptions, mp.addPoetry, includeBooks, saveDir)
+        calculateSimilarity(splitParameter, newTop, subsetSize, compSimOptions, includeBooks, saveDir)
         print("====================================")
         print("====================================")
 
@@ -48,8 +56,6 @@ for language in ["Greek", "English", "Icelandic"]:
             print("====================================")
             print("Creating basic graphs...")
             basicGraphs(splitParameter, newTop, saveDir)
-            print("Creating normalized graphs...")
-            normalizedGraphs(splitParameter, newTop, saveDir)
             print("====================================")
             print("====================================")
             print("Predicting Categories...")
@@ -70,19 +76,11 @@ for language in ["Greek", "English", "Icelandic"]:
         print("********************************************")
         print("********************************************")
 
-
-# Get additional charts for metric usage
-print("====================================")
-print("====================================")
-print("Gathering additional metric stats...")
-metricCapture()
-
 # Move Files
 print("====================================")
 print("====================================")
 print("Moving Files...")
 
-#gatherFiles(mp.topStr, mp.topNum, mp.comparableTopStr, mp.comparableTopNum, mp.poetryNum)
 gatherFilesFull(mp.topStr, mp.topNum, mp.comparableTopStr, mp.comparableTopNum, mp.poetryNum)
 
 print("========================================================================")

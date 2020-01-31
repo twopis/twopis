@@ -11,6 +11,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.backends.backend_pdf import PdfPages
 
+import seaborn as sns
+import ptitprince as pt
+
 from sklearn import decomposition
 
 # For Regression
@@ -19,7 +22,8 @@ import statsmodels.api as sm
 
 import utils
 import tsne
-import umap
+# version 0.3.8
+# import umap
 
 # Object for storing a dataset
 class Dataset:
@@ -403,7 +407,7 @@ def centuryComparisonOverall(data, y, names, saveOutput, saveDir):
 
 # graph centuries between on the x axis, similarity on the y axis
 # Consider all texts, divide by genre
-def centuryComparisonByGenre(data, y, names, saveOutput, saveDir):
+def centuryComparisonByGenre(data, y, names, saveOutput, saveDir, raincloud=False, violin=False):
     newData = []
     newY = []
     indices = []
@@ -421,7 +425,8 @@ def centuryComparisonByGenre(data, y, names, saveOutput, saveDir):
     predefinedColors = [(150, 205, 230), (186, 28, 48), (0, 0, 0)]
     legendLabels = ["Same Genre", "Different Genres", "All Pairs"]
     legendOrder = [2, 0, 1]
-    centuryComparison(newData, newY, newNames, saveOutput, False, True, True, predefinedColors, legendLabels, legendOrder, saveDir, "century_sims_genre", [0.87, 1.0])
+    centuryComparison(newData, newY, newNames, saveOutput, False, True, True, predefinedColors, legendLabels, legendOrder, saveDir, "century_sims_genre", [0.87, 1.0], raincloud=raincloud, violin=violin)
+    centuryComparison(newData, newY-newY, newNames, saveOutput, False, True, True, predefinedColors, legendLabels, legendOrder, saveDir, "century_sims_genre_genre_collapsed", [0.87, 1.0], raincloud=raincloud, violin=violin)
 
     # Cut off the tail after a cutoff
     TAIL_CUTOFF = 9
@@ -440,12 +445,13 @@ def centuryComparisonByGenre(data, y, names, saveOutput, saveDir):
         cutoffData = newData[cutoffIndices]
         cutoffY = newY[cutoffIndices]
         cutoffNames = newNames[cutoffIndices]
-        centuryComparison(cutoffData, cutoffY, cutoffNames, saveOutput, False, True, True, predefinedColors, legendLabels, legendOrder, saveDir, "century_sims_genre_under_%d" % TAIL_CUTOFF, [0.87, 1.0])
+        centuryComparison(cutoffData, cutoffY, cutoffNames, saveOutput, False, True, True, predefinedColors, legendLabels, legendOrder, saveDir, "century_sims_genre_under_%d" % TAIL_CUTOFF, [0.87, 1.0], raincloud=raincloud, violin=violin)
+        centuryComparison(cutoffData, cutoffY-cutoffY, cutoffNames, saveOutput, False, True, True, predefinedColors, legendLabels, legendOrder, saveDir, "century_sims_genre_under_%d_collapsed" % TAIL_CUTOFF, [0.87, 1.0], raincloud=raincloud, violin=violin)
 
 
 # graph centuries between on the x axis, similarity on the y axis
 # color texts based on whether they represent sets of the same/different genres
-def centuryComparison(data, y, names, saveOutput, showAverage, showLinReg, separateGenres, predefinedColors, legendLabelsBase, legendOrder, saveDir, fname="century_sims", ylim=None):
+def centuryComparison(data, y, names, saveOutput, showAverage, showLinReg, separateGenres, predefinedColors, legendLabelsBase, legendOrder, saveDir, fname="century_sims", ylim=None, raincloud=False, violin=False):
     legendLabels = copy.deepcopy(legendLabelsBase)
 
     averageStorage = {}
@@ -586,12 +592,51 @@ def centuryComparison(data, y, names, saveOutput, showAverage, showLinReg, separ
         legendLabels[2] = "%s (%s)" % (legendLabels[2], linRegData["normal"]["info"])
 
 
-    for includeNames in [True, False]:
-        fig = initStandardChart(saveOutput)
-        fig.set_size_inches((11.), (6.8))
+    includeOptions = [True, False]
+    if (raincloud or violin):
+        includeOptions = [False]
 
-        colors = colorMap(yFinal)
-        plt.scatter(Xfinal[:, 0], Xfinal[:, 1], s=9, c=colors, cmap=colorMap, alpha=0.6, linewidths=0)
+
+    for includeNames in includeOptions:
+
+        if raincloud:
+            plt.clf()
+            fig, ax = plt.subplots()
+            fig.set_size_inches((11.), (6.8))
+
+            palette = pctColors[:1]
+            hue = None
+            if (np.unique(yFinal).size > 1):
+                hue = yFinal
+                palette=pctColors
+
+            # For median line: pointplot = True
+            ax=pt.RainCloud(x=np.round(data[:, 0]), y=data[:, 1], hue=hue, palette=palette, bw=.2,
+              width_viol=.5, ax=ax, orient="v", alpha=.65, dodge=True, move=.2)
+        elif violin:
+            plt.clf()
+            fig, ax = plt.subplots()
+            fig.set_size_inches((11.), (6.8))
+
+            palette = pctColors[:1]
+            hue = None
+            if (np.unique(yFinal).size > 1):
+                hue = yFinal
+                palette=pctColors
+
+            vX = np.round(data[:, 0])
+            vY = data[:, 1]
+            pt.half_violinplot(x=vX, y=vY, hue=hue, palette=palette, bw=.2,
+              width=0.5, orient="v", offset=0, cut=0., scale="area", inner=None, split=True)
+            _=plt.setp(ax.collections + ax.artists, alpha=0.65)
+            ax=pt.stripplot(x=vX, y=vY, hue=hue, palette=palette, ax=ax, orient="v", dodge=True,
+                    move=.2, edgecolor="white", size=3, jitter=1, zorder=0, width=.15)
+
+        else:
+            fig = initStandardChart(saveOutput)
+            fig.set_size_inches((11.), (6.8))
+            colors = colorMap(yFinal)
+            plt.scatter(Xfinal[:, 0], Xfinal[:, 1], s=9, c=colors, cmap=colorMap, alpha=0.6, linewidths=0)
 
         if (showAverage):
             # Averages
@@ -654,11 +699,33 @@ def centuryComparison(data, y, names, saveOutput, showAverage, showLinReg, separ
             labelText = "_labels"
         else:
             labelText = "_no_labels"
+
+        if raincloud:
+            labelText += "_raincloud"
+        elif violin:
+            labelText += "_violin"
+
         filename = saveDir + fname + labelText + ".pdf"
 
         finishChart(saveOutput, filename)
 
+# showLinReg, , , ylim=None
+def raincloudPlot(data, y, saveOutput, predefinedColors, saveDir, fname="century_sims_rainplot"):
+    group = [0, 0, 1, 1, 0, 0, 1, 1]
 
+    pctColors = getPercentColors(predefinedColors)
+    colorMap = LinearSegmentedColormap.from_list("custom", pctColors, N=len(pctColors))
+
+    fig, ax = plt.subplots()
+    if saveOutput:
+        fig.set_size_inches((11.), (6.8))
+
+    sigma = .2
+    ax=pt.RainCloud(x=data, y=y, hue=group, palette=pctColors, bw=sigma,
+                     width_viol=.5, ax=ax, orient="v", alpha=.65, dodge = True, pointplot = True, move = .2)
+
+    filename = saveDir + fname + ".pdf"
+    finishChart(saveOutput, filename)
 
 # ==============================================================================
 # ==============================================================================
@@ -1001,6 +1068,13 @@ def tSNE_2D_4Up(dataSet, names, highlightAuthor, saveOutput, saveDir, fname, run
             colorsFinal = colorMap(colors)
 
         scat = ax.scatter(Xfinal[:, 0], Xfinal[:, 1], s=16, c=colorsFinal, picker=True)
+
+        # Highlight outliers
+        if (highlightAuthor):
+            for i in range(len(tsneX)):
+                name = namesFinal[i]
+                if (name == t["outlierName"]):
+                    ax.text(tsneX[i, 0], (tsneX[i, 1] - 10), t["prettyName"], horizontalalignment='center', size=10, bbox=dict(facecolor='white', alpha=0.8))
 
         # add in legend
         # skip broad genre (i == 1)

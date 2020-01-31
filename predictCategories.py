@@ -12,7 +12,7 @@ from getWordCounts import loadWCData
 from makeBasicGraphs import normalizeFeatures
 
 
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, GroupKFold
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import MultinomialNB
 
@@ -107,7 +107,7 @@ def naiveBayes(X, y, splits, saveDir):
 
 
 # given data, target, and names, run all ML algorithms
-def runMLAlgorithms(X, tokens, y, type_name, category_name, saveDir):
+def runMLAlgorithms(X, tokens, y, groups, type_name, category_name, saveDir):
     X = np.array(X)
     y = np.array(y)
 
@@ -118,9 +118,10 @@ def runMLAlgorithms(X, tokens, y, type_name, category_name, saveDir):
     counts = np.array(counts)
 
     # 9 splits yields ~10 test authors per fold
-    kf = KFold(n_splits=9, shuffle=True, random_state=KFOLD_RANDOM)
+    kf = GroupKFold(n_splits=9)
 
-    splits = list(kf.split(X))
+    # Ensure no work has books (segments) in both the training and test set.
+    splits = list(kf.split(X, None, groups))
 
     output = []
     output.append("Average results for %s (%s) across %d folds:" % (category_name, type_name, len(splits)))
@@ -154,25 +155,36 @@ def makeAllPredictions(authors, books, topWords, saveDir):
     # aggregate features for each author into one dataSet
     a_data = []
     a_tokens = []
+    a_groups = []
     for i in range(len(authors)):
         author = authors[i]
         a_data.append(author.featureData[:-1]) # final item is the count for all other words
         a_tokens.append(author.totalTokenCount)
+        a_groups.append(author.authorName)
 
     # aggregate features for each book
     b_data = []
     b_target = []
     b_tokens = []
-    for book in books:
+    b_groups = []
+    b_groups_2 = []
+    for i, book in enumerate(books):
         if (book.numTokens >= mp.MIN_TOKENS_NECESSARY):
             b_data.append(book.featureData[:-1]) # final item is the count for all other words
             b_tokens.append(book.numTokens)
-
-
+            b_groups.append(book.textName)
+            b_groups_2.append(i)
 
     namesToIndex = {}
     for i, author in enumerate(authors):
         namesToIndex[author.authorName] = i
+
+    workToIndex = {}
+    index = 0
+    for i, book in enumerate(books):
+        if not(book.textName in workToIndex):
+            workToIndex[book.textName] = index
+            index += 1
 
     # we predict genre, timeframe, and dialect
     predictionTypes = [
@@ -187,13 +199,14 @@ def makeAllPredictions(authors, books, topWords, saveDir):
         a_target = []
         for author in authors:
             a_target.append(convert[author.authorName])
-        runMLAlgorithms(a_data, a_tokens, a_target, a_typeName, name, saveDir)
+        runMLAlgorithms(a_data, a_tokens, a_target, a_groups, a_typeName, name, saveDir)
 
 
 
     # for books, add author prediction.
     predictionTypes.append(("author", namesToIndex))
 
+    # Predictions without segments from a work in both training and test.
     for p in predictionTypes:
         name, convert = p
 
@@ -201,10 +214,32 @@ def makeAllPredictions(authors, books, topWords, saveDir):
         for book in books:
             if (book.numTokens < mp.MIN_TOKENS_NECESSARY):
                 continue
-
             b_target.append(convert[book.author])
 
-        runMLAlgorithms(b_data, b_tokens, b_target, b_typeName, name, saveDir)
+        runMLAlgorithms(b_data, b_tokens, b_target, b_groups, b_typeName, name, saveDir)
+
+    # Predictions with segments from a work in both training and test.
+    for p in predictionTypes:
+        name, convert = p
+
+        b_target = []
+        for book in books:
+            if (book.numTokens < mp.MIN_TOKENS_NECESSARY):
+                continue
+            b_target.append(convert[book.author])
+
+        runMLAlgorithms(b_data, b_tokens, b_target, b_groups_2, b_typeName + "_2", name, saveDir)
+
+    # Predict works as well
+    for p in predictionTypes:
+        b_target = []
+        for book in books:
+            if (book.numTokens < mp.MIN_TOKENS_NECESSARY):
+                continue
+            b_target.append(workToIndex[book.textName])
+
+        runMLAlgorithms(b_data, b_tokens, b_target, b_groups_2, b_typeName + "_2", "work", saveDir)
+
 
 # ===========================================================
 # ===================== Run Everything ======================
@@ -218,8 +253,6 @@ def predictCategories(dataSplit, top, saveDirBase):
     normalizations = []
     # normalize nothing
     normalizations.append({"name":"", "norm": []})
-    # normalize everything
-    normalizations.append({"name":"allNorm", "norm": range(len(topWords))})
     for normIndex, norm in enumerate(normalizations):
         normalizeFeatures(authors, books, norm["norm"])
 

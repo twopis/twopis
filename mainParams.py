@@ -22,8 +22,8 @@ language = "Greek"
 
 
 
-topNum = 145
-comparableTopNum = 172;
+topNum = 250 # 145
+comparableTopNum = 264 # 172
 poetryNum = 100
 topStr = "top%d" % topNum
 comparableTopStr = "top%d" % comparableTopNum
@@ -44,8 +44,8 @@ languageInfo = {
             # (topStr, topNum, -1, -1, 5, True, False, False, wtp.greek),
             # (topPlusPStr, topNum, poetryNum, -1, -2, True, False, False, wtp.greek),
             # (topPlusPStr, topNum, poetryNum, -1, 5, True, False, False, wtp.greek),
-            # Main analysis with top 145 and top 145 + poetry
-            (topStr, topNum, -1, -1, -1, True, True, False, wtp.greek),
+            # Main analysis with top and top + poetry
+            (topStr, topNum, -1, -1, -1, True, True, True, wtp.greek),
             (comparableTopStr, comparableTopNum, -1, -1, -1, True, False, False, wtp.greek),
             (topPlusPStr, topNum, poetryNum, -1, -1, True, True, True, wtp.greek),
             # This lets us count the order of top poetry words

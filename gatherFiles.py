@@ -38,11 +38,11 @@ def colorConvert(min, max, current, startColor, endColor):
 # create tables with information evaluating given metrics
 def makeMetricEvalTables(suffix, topStr, comparableTopStr, topNum, poetryNum, comparableNum, simMetrics, baseFolder):
     baseScoreInfo = [
-        ("Cosine", 1),
-        ("Burrows' Delta", 1),
+        ("Cosine", 0),
+        ("Burrows' Delta", 0),
     ]
 
-    bestMetricName = "Jensen-Shannon+p"
+    bestMetricName = "Jensen-Shannon (250)" #Jensen-Shannon+p
     bestMetricSigWork = []
     bestMetricSigAuthor = []
 
@@ -69,11 +69,11 @@ def makeMetricEvalTables(suffix, topStr, comparableTopStr, topNum, poetryNum, co
     sameWorkTableOutput.append(temp)
     sameAuthorTableOutput.append(temp)
 
-    temp = "& \\textbf{Top %d +} & & \\\\" % (topNum)
+    temp = "& & \\textbf{Top %d +} & \\\\" % (topNum)
     sameWorkTableOutput.append(temp)
     sameAuthorTableOutput.append(temp)
 
-    temp = "\\textbf{Metric}& \\textbf{Top %d in Poetry} & \\textbf{Top %d} & \\textbf{Top %d} \\\\\\hline" % (poetryNum, comparableNum, topNum)
+    temp = "\\textbf{Metric}& \\textbf{Top %d} & \\textbf{Top %d in Poetry} & \\textbf{Top %d} \\\\\\hline" % (topNum, poetryNum, comparableNum)
     sameWorkTableOutput.append(temp)
     sameAuthorTableOutput.append(temp)
 
@@ -88,7 +88,7 @@ def makeMetricEvalTables(suffix, topStr, comparableTopStr, topNum, poetryNum, co
     for simMetric in simMetrics:
         dir, metricName = simMetric
         scoreLists[metricName] = {}
-        for i, params in enumerate([(True, False), (False, True), (False, False)]):
+        for i, params in enumerate([(False, False), (True, False), (False, True), ]):
             name = metricName
             addP, comparable = params
             metricTopStr = topStr
@@ -153,7 +153,6 @@ def makeMetricEvalTables(suffix, topStr, comparableTopStr, topNum, poetryNum, co
                 df = len(b) - 1
                 authorSig = "  (M=%.3f, SD=%.3f) t(%d)=%.3f, p=%.3e" % (np.mean(b), np.std(b), df, author_t, author_p)
                 authorSigReport.append(authorSig)
-
 
                 if (name == bestMetricName or name == baseScore["name"]):
                     bestMetricSigWork.append("%s vs %s" % (name, baseScore["name"]))
@@ -396,16 +395,22 @@ def makeMetricInternalTables(suffix, topStr, simMetrics, baseFolder):
 
 # Get author pairs for authors 4 centuries apart with high similarity.
 def fourCenturiesTables(topStr, simMetrics, baseFolder):
+    comparisonOutput = []
     topSimsToExamine = 100
 
-    authorSims = utils.getContent("output/greek/no_split/%s+p/jensen-shannon/metric/Authors/sims.txt" % (topStr), False).split("\n")
+    # Grab this from the best metric
+    authorSims = utils.getContent("output/greek/no_split/%s/jensen-shannon/metric/Authors/sims.txt" % (topStr), False).split("\n")
     topDistantSims = []
     topDistantAuthors = {}
-    for sim in authorSims[:topSimsToExamine]:
+    for i, sim in enumerate(authorSims):
         centuries_apart = int(sim.split("(")[-1].split(" ")[0])
-        if (centuries_apart >= 4):
+        if (centuries_apart >= 4 and i < topSimsToExamine):
             topDistantSims.append(sim)
             topDistantAuthors[sim[11:]] = {}
+
+        authors = " (".join(sim.split(" - ")[1].split(" (")[:-1])
+        if authors == "Isocrates, Lysias" or authors == "Plato, Xenophon" or authors == "AratusSolensis, Callimachus" or authors == "Herodotus, Thucydides":
+            comparisonOutput.append("Rank %d: %s" % (i+1, sim))
 
     fourCenturiesApartOutput = []
     fourCenturiesApartOutput.append("%d of the top %d are at least 4 centuries apart." % (len(topDistantSims), topSimsToExamine))
@@ -414,9 +419,54 @@ def fourCenturiesTables(topStr, simMetrics, baseFolder):
 
     utils.safeWrite("%swordUse/fourCenturiesApart.txt" % baseFolder, "\n".join(fourCenturiesApartOutput))
 
+    # Comparison to English and Icelandic
+    numGreek = len(authorSims)
+    fracGreek = topSimsToExamine/numGreek
+    numDistantGreek = len(topDistantSims)
+
+    englishSims = utils.getContent("output/english/no_split/%s/jensen-shannon/metric/Authors/sims.txt" % (topStr), False).split("\n")
+    numEnglish = len(englishSims)
+    topSimsEnglish = int(np.ceil(numEnglish*fracGreek))
+    fracEnglish = topSimsEnglish/numEnglish
+    numDistantEnglish = 0
+    num2English = 0
+    for sim in englishSims[:topSimsEnglish]:
+        centuries_apart = int(sim.split("(")[-1].split(" ")[0])
+        if (centuries_apart >= 2):
+            num2English += 1
+        if (centuries_apart >= 4):
+            numDistantEnglish += 1
+
+    iceSims = utils.getContent("output/icelandic/no_split/%s/jensen-shannon/metric/Authors/sims.txt" % (topStr), False).split("\n")
+    numIcelandic = len(iceSims)
+    topSimsIcelandic = int(np.ceil(numIcelandic*fracGreek))
+    fracIcelandic = topSimsIcelandic/numIcelandic
+    numDistantIcelandic = 0
+    for sim in iceSims[:topSimsIcelandic]:
+        centuries_apart = int(sim.split("(")[-1].split(" ")[0])
+        if (centuries_apart >= 4):
+            numDistantIcelandic += 1
+
+    comparisonOutput.append("\n=========\n")
+    comparisonOutput.append("Top similar pairs")
+    comparisonOutput.append("Greek:")
+    comparisonOutput.append("  examining top %d of %d pairs (%.2f%%)" % (topSimsToExamine, numGreek, 100*fracGreek))
+    comparisonOutput.append("  %d (%.2f%%) are at least 4 centuries apart" % (numDistantGreek, 100*numDistantGreek/topSimsToExamine))
+    comparisonOutput.append("English:")
+    comparisonOutput.append("  examining top %d of %d pairs (%.2f%%)" % (topSimsEnglish, numEnglish, 100*fracEnglish))
+    comparisonOutput.append("  %d (%.2f%%) are at least 4 centuries apart" % (numDistantEnglish, 100*numDistantEnglish/topSimsEnglish))
+    comparisonOutput.append("  %d (%.2f%%) are at least 2 centuries apart" % (num2English, 100*num2English/topSimsEnglish))
+    comparisonOutput.append("Icelandic:")
+    comparisonOutput.append("  examining top %d of %d pairs (%.2f%%)" % (topSimsIcelandic, numIcelandic, 100*fracIcelandic))
+    comparisonOutput.append("  %d (%.2f%%) are at least 4 centuries apart" % (numDistantIcelandic, 100*numDistantIcelandic/topSimsIcelandic))
+
+    utils.safeWrite("%swordUse/fourApartComparisonInfo.txt" % baseFolder, "\n".join(comparisonOutput))
+
+    # Table
     for simMetric in simMetrics:
         dir, name = simMetric
-        metricSims = utils.getContent("output/greek/no_split/%s+p/%s/metric/Authors/sims.txt" % (topStr, dir), False).split("\n")
+        # "" or "+p" depending on which is better
+        metricSims = utils.getContent("output/greek/no_split/%s/%s/metric/Authors/sims.txt" % (topStr, dir), False).split("\n")
         for i, sim in enumerate(metricSims):
             pairName = sim[11:]
             if pairName in topDistantAuthors:
@@ -433,22 +483,29 @@ def fourCenturiesTables(topStr, simMetrics, baseFolder):
             maxVal = max(maxVal, val)
 
     pairRankOutput = []
+    pairRankOutputSimple = []
     pairRankOutput.append("""
     \\begin{table}[!bt]
       \\centering
       \\def\\arraystretch{1}
-      \\begin{tabular}{| l | c | c | c | c | c |}
+      \\begin{tabular}{| l | c | c | c | c | c | c |}
     \\hline
     & \\multicolumn{5}{c|}{\\textbf{Rank according to}} \\\\
-    & \\textbf{Jensen-} & \\textbf{Burrows'} & & & \\\\
-    \\textbf{Authors} & \\textbf{Shannon} & \\textbf{Delta} & \\textbf{Manhattan} & \\textbf{Canberra} & \\textbf{Cosine} \\\\\\hline
+    & \\textbf{Jensen-} & \\textbf{Burrows'} & & & & \\\\
+    \\textbf{Authors} & \\textbf{Shannon} & \\textbf{Delta} & \\textbf{Min-Max} & \\textbf{Manhattan} & \\textbf{Canberra} & \\textbf{Cosine} \\\\\\hline
     """)
+    pairRankOutputSimple.append("%s,%s,%s,%s,%s,%s,%s" % ("Authors", "Jensen-Shannon", "Burrow's Delta", "Min-Max", "Manhattan", "Canberra", "Cosine"))
     authorConvert = {
         "ApolloniusRhodius": "Apollonius",
         "DionysiusOfHalicarnassus": "Dionysius",
         "EusebiusOfCaesarea": "Eusebius",
         "ClementOfAlexandria": "Clement",
         "BasilBishopOfCaesarea": "Basil",
+        "Anonymous(Hymns_Aphrodite)": "Hymns Aphrodite",
+        "Anonymous(Hymns_Apollo)": "Hymns Apollo",
+        "Anonymous(Hymns_Demeter)": "Hymns Demeter",
+        "Anonymous(Hymns_Hermes)": "Hymns Hermes",
+        "Anonymous(Hymns_Rest)": "Hymns Rest",
     }
     for authorPair in topDistantAuthors:
         pair = "(".join(authorPair.split(" (")[:-1])
@@ -463,6 +520,8 @@ def fourCenturiesTables(topStr, simMetrics, baseFolder):
 
         pairName = author1 + ", " + author2
         cell = "%s &" % pairName
+        cellSimple = "%s," % re.sub(", ", "/", pairName)
+        firstVal = None
         for simDir, _ in simMetrics:
             val = topDistantAuthors[authorPair][simDir]
 
@@ -471,9 +530,19 @@ def fourCenturiesTables(topStr, simMetrics, baseFolder):
                 r, g, b = colorConvert(minVal, cutoff, val, COLOR_ORANGE, COLOR_GRAY)
             else:
                 r, g, b = colorConvert(cutoff, maxVal, val, COLOR_GRAY, COLOR_BLUE)
-            cell += "\\cellcolor[rgb]{%.3f,%.3f,%.3f} %d & " % (r, g, b, val)
+            cell += "\\cellcolor[rgb]{%.3f,%.3f,%.3f} " % (r, g, b)
+
+            if (firstVal == None):
+                firstVal = val
+                cell += "%d & " % (val)
+                cellSimple += "%d," % (val)
+            else:
+                cell += "%d (%+d) & " % (val, firstVal - val)
+                rel = "(%d)" % (firstVal - val)
+                cellSimple += "%d %s," % (val, rel)
         cell = cell[:-2]
         pairRankOutput.append("%s\\\\\\hline" % cell)
+        pairRankOutputSimple.append(cellSimple)
     pairRankOutput.append("""
       \\end{tabular}
       \\caption{Rank of these pair's similarity by different metrics.}
@@ -482,6 +551,7 @@ def fourCenturiesTables(topStr, simMetrics, baseFolder):
     """)
 
     utils.safeWrite("%swordUse/pairRankTable.tex" % baseFolder, "\n".join(pairRankOutput))
+    utils.safeWrite("%swordUse/pairRankTableSimple.csv" % baseFolder, "\n".join(pairRankOutputSimple))
 
 
 # Get info on number of words used and create the table of top words
@@ -561,26 +631,78 @@ def getWordUseInfo(topStr, baseFolder):
 # Get author and book counts for our languages for the data section
 def getAuthorBookCounts(baseFolder):
     ab_counts_output = []
-    splitter = "------"
+    splitter = "\n------\n"
 
-    ab_counts_output.append("Greek:")
-    ab_counts_output.append(utils.getContent("output/greek/no_split/numberOfAuthors_Books.txt", False))
-    ab_counts_output.append(utils.getContent("output/greek/no_split/numberOfTypes_Tokens.txt", False))
+    ab_counts_output.append("Greek:\n")
+    ab_counts_output.append(utils.getContent("output/greek/numberOfAuthors_Books.txt", False))
+    ab_counts_output.append(utils.getContent("output/greek/numberOfTypes_Tokens.txt", False))
     ab_counts_output.append(splitter)
-    ab_counts_output.append("English:")
-    ab_counts_output.append(utils.getContent("output/english/no_split/numberOfAuthors_Books.txt", False))
-    ab_counts_output.append(utils.getContent("output/english/no_split/numberOfTypes_Tokens.txt", False))
+    ab_counts_output.append("English:\n")
+    ab_counts_output.append(utils.getContent("output/english/numberOfAuthors_Books.txt", False))
+    ab_counts_output.append(utils.getContent("output/english/numberOfTypes_Tokens.txt", False))
     ab_counts_output.append(splitter)
-    ab_counts_output.append("Icelandic:")
-    ab_counts_output.append(utils.getContent("output/icelandic/no_split/numberOfAuthors_Books.txt", False))
-    ab_counts_output.append(utils.getContent("output/icelandic/no_split/numberOfTypes_Tokens.txt", False))
+    ab_counts_output.append("Icelandic:\n")
+    ab_counts_output.append(utils.getContent("output/icelandic/numberOfAuthors_Books.txt", False))
+    ab_counts_output.append(utils.getContent("output/icelandic/numberOfTypes_Tokens.txt", False))
     ab_counts_output.append(splitter)
 
-    utils.safeWrite("%s/data/AuthorBookNumbers.txt" % baseFolder, "\n".join(ab_counts_output))
+    utils.safeWrite("%s/AuthorBookNumbers.txt" % baseFolder, "\n".join(ab_counts_output))
+
+# Get word overlap info
+def getOverlapInfo(baseFolder):
+    output = []
+    splitter = "\n------\n"
+
+    output.append("Greek:\n")
+    output.append(utils.getContent("output/greek/topWordOverlapOverTime.txt", False))
+    output.append(splitter)
+    output.append("English:\n")
+    output.append(utils.getContent("output/english/topWordOverlapOverTime.txt", False))
+    output.append(splitter)
+    output.append("Icelandic:\n")
+    output.append(utils.getContent("output/icelandic/topWordOverlapOverTime.txt", False))
+    output.append(splitter)
+
+    utils.safeWrite("%s/topWordOverlapOverTime.txt" % baseFolder, "\n".join(output))
+
+# Get information about words that were skipped
+def getSkippedWordInfo(baseFolder):
+    output = []
+    splitter = "\n------\n"
+
+    output.append("Greek:\n")
+    output.append(utils.getContent("output/greek/no_split/top250/chosenWordInfo.txt", False))
+    output.append("\nPoetry:")
+    output.append(utils.getContent("output/greek/no_split/top250+p/chosenWordInfoPoetry.txt", False))
+    output.append(splitter)
+    output.append("English:\n")
+    output.append(utils.getContent("output/english/no_split/top250/chosenWordInfo.txt", False))
+    output.append("\nPoetry:")
+    output.append(utils.getContent("output/english/no_split/top250+p/chosenWordInfoPoetry.txt", False))
+    output.append(splitter)
+    output.append("Icelandic:\n")
+    output.append(utils.getContent("output/icelandic/no_split/top250/chosenWordInfo.txt", False))
+    output.append(splitter)
+
+    utils.safeWrite("%s/skippedWords.txt" % baseFolder, "\n".join(output))
+
+def getDataInfo(topStr, baseFolder):
+    baseFolder = baseFolder + "/data"
+
+    getAuthorBookCounts(baseFolder)
+
+    getOverlapInfo(baseFolder)
+
+    getSkippedWordInfo(baseFolder)
+
+    subprocess.run("cp output/greek/no_split/%s/wordsTable.csv %s/wordsTableGreek_%s.csv" % (topStr, baseFolder, topStr), shell=True)
+    subprocess.run("cp output/english/no_split/%s/wordsTable.csv %s/wordsTableEnglish_%s.csv" % (topStr, baseFolder, topStr), shell=True)
+    subprocess.run("cp output/icelandic/no_split/%s/wordsTable.csv %s/wordsTableIcelandic_%s.csv" % (topStr, baseFolder, topStr), shell=True)
 
 # Get information on the top authors
 def makeTopAuthorTable(topStr, baseFolder):
-    fname = "output/greek/no_split/%s+p/jensen-shannon/metric/Authors/sims.txt" % (topStr)
+    # Grab this from the best metric
+    fname = "output/greek/no_split/%s/jensen-shannon/metric/Authors/sims.txt" % (topStr)
     allAuthorSims = utils.getContent(fname, False).split("\n")
 
     topAuthorPairs = []
@@ -628,10 +750,12 @@ def makeMLTable(source, norm, filename):
         output.append("  \\textbf{Prediction Task} & \\textbf{Majority Class} & \\textbf{KNN} & \\textbf{Naive Bayes}  \\\\\\hline")
 
 
-    for t in ["Authors", "Books"]:
+    for t in ["Authors", "Books", "Books_2"]:
         cats = ["genre", "dialect", "timeframe"]
         if (t == "Books"):
             cats.append("author")
+        if (t == "Books_2"):
+            cats = ["work", "genre", "dialect", "timeframe", "author"]
 
         for cat in cats:
             fname = source + "res_%s_%s.txt" % (cat, t)
@@ -643,6 +767,8 @@ def makeMLTable(source, norm, filename):
             t_name = t
             if t_name == "Books":
                 t_name = "Segments"
+            if t_name == "Books_2":
+                t_name = "Segments*"
             if norm:
                 output.append(" %s of %s & %s & %s \\\\\\hline" % (cat, t_name, maj_class, knn))
             else:
@@ -673,8 +799,25 @@ def getMetricInfo(topStr, comparableTopStr, topNum, poetryNum, comparableNum, si
     subprocess.run("cp output/greek/no_split/%s/jensen-shannon/metric/Books/comparisonInfo.txt %smetric/extraInfo/metricEvaluation_tops.txt" % (topStr, baseFolder), shell=True)
     subprocess.run("cp output/greek/no_split/%s+p/jensen-shannon/metric/Books/comparisonInfo.txt %smetric/extraInfo/metricEvaluation_+p.txt" % (topStr, baseFolder), shell=True)
 
+    # Grab median distance
+    fname = "output/greek/no_split/%s/jensen-shannon/metric/Books/comparisonInfo.txt" % (topStr)
+    metricEvalInfo = utils.getContent(fname, False).split("=========")[-2].split("\n")[2:-1]
+    sameAuthorRanks = []
+    for i, line in enumerate(metricEvalInfo):
+        sameAuthorRank = line.split("with same author: ")[1].split(".")[0]
+        sameAuthorRanks.append(int(sameAuthorRank))
+
+    median = np.median(sameAuthorRanks)
+
+    utils.safeWrite("%smetric/extraInfo/medianForDifferentAuthor.txt" % (baseFolder), "Median distance for closest author: %f" % median)
+
+    # get info on the indica
+    subprocess.run("cp output/greek/no_split/%s/jensen-shannon/metric/Books/sims/Arrian.Indica.1.txt %smetric/extraInfo/arrianIndica.txt" % (topStr, baseFolder), shell=True)
+
+
     # Info on book distance
-    fname = "output/greek/no_split/%s+p/jensen-shannon/metric/Books/sims.txt" % (topStr)
+    # Grab this from the best metric
+    fname = "output/greek/no_split/%s/jensen-shannon/metric/Books/sims.txt" % (topStr)
     allBookSims = utils.getContent(fname, False).split("\n")
 
     utils.safeWrite("%smetric/lowestSimilarity.txt" % (baseFolder), "Lowest similarity between segments: %s" % allBookSims[-1])
@@ -714,14 +857,17 @@ def getCenturyInfo(topStr, baseFolder):
 
 
     subprocess.run("cp output/greek/no_split/%s/jensen-shannon/metric/Authors/century_sims_genre_under_9_no_labels.pdf %scentury/centuriesGreek2.pdf" % (topStr, baseFolder), shell=True)
+    subprocess.run("cp output/greek/no_split/%s/jensen-shannon/metric/Authors/century_sims_genre_under_9_no_labels_violin.pdf %scentury/centuriesGreekViolin.pdf" % (topStr, baseFolder), shell=True)
 
 
     subprocess.run("cp output/english/no_split/%s/jensen-shannon/metric/Authors/simRange.txt %scentury/extraInfo/English_SimRange.txt" % (topStr, baseFolder), shell=True)
     subprocess.run("cp output/english/no_split/%s/jensen-shannon/metric/Authors/century_sims_genre_no_labels.pdf %scentury/centuriesEnglish.pdf" % (topStr, baseFolder), shell=True)
+    subprocess.run("cp output/english/no_split/%s/jensen-shannon/metric/Authors/century_sims_genre_no_labels_violin.pdf %scentury/centuriesEnglishViolin.pdf" % (topStr, baseFolder), shell=True)
     subprocess.run("cp output/english/no_split/%s/jensen-shannon/metric/Authors/century_sims_genre_labels.pdf %scentury/extraInfo/English_Century_Label.pdf" % (topStr, baseFolder), shell=True)
 
     subprocess.run("cp output/icelandic/no_split/%s/jensen-shannon/metric/Authors/simRange.txt %scentury/extraInfo/Icelandic_SimRange.txt" % (topStr, baseFolder), shell=True)
     subprocess.run("cp output/icelandic/no_split/%s/jensen-shannon/metric/Authors/century_sims_genre_no_labels.pdf %scentury/centuriesIcelandic.pdf" % (topStr, baseFolder), shell=True)
+    subprocess.run("cp output/icelandic/no_split/%s/jensen-shannon/metric/Authors/century_sims_genre_no_labels_violin.pdf %scentury/centuriesIcelandicViolin.pdf" % (topStr, baseFolder), shell=True)
     subprocess.run("cp output/icelandic/no_split/%s/jensen-shannon/metric/Authors/century_sims_genre_labels.pdf %scentury/extraInfo/Icelandic_Century_Label.pdf" % (topStr, baseFolder), shell=True)
 
 
@@ -743,16 +889,17 @@ def getCenturyInfo(topStr, baseFolder):
 # Get charts on word usage across authors and by specific author pairs
 def getWordUsageInfo(topStr, baseFolder):
     # Word usage charts
-    subprocess.run("cp output/greek/no_split/%s+p/wordImportance/Jensen-shannon-sorted/ignoreBestWords.pdf %swordUse/ignoreBestWords.pdf" % (topStr, baseFolder), shell=True)
-    subprocess.run("cp output/greek/no_split/%s+p/wordImportance/Jensen-shannon-sorted/all-diffs-cumul-cloud.pdf %swordUse/extraInfo/broadWordUsage.pdf" % (topStr, baseFolder), shell=True)
-    subprocess.run("cp output/greek/no_split/%s+p/wordImportance/Jensen-shannon-sorted/all-diffs-cumul.pdf %swordUse/extraInfo/all-diffs-cumul.pdf" % (topStr, baseFolder), shell=True)
+    # Grab these from the best metric
+    subprocess.run("cp output/greek/no_split/%s/wordImportance/Jensen-shannon-sorted/ignoreBestWords.pdf %swordUse/ignoreBestWords.pdf" % (topStr, baseFolder), shell=True)
+    subprocess.run("cp output/greek/no_split/%s/wordImportance/Jensen-shannon-sorted/all-diffs-cumul-cloud.pdf %swordUse/extraInfo/broadWordUsage.pdf" % (topStr, baseFolder), shell=True)
+    subprocess.run("cp output/greek/no_split/%s/wordImportance/Jensen-shannon-sorted/all-diffs-cumul.pdf %swordUse/extraInfo/all-diffs-cumul.pdf" % (topStr, baseFolder), shell=True)
 
 
     # Word organization charts
-    subprocess.run("cp output/greek/no_split/%s+p/textsOnlyTopWords/9_group/tSNE/Word_Groupings_tSNE_2D_labels.pdf %swordUse/wordGroups.pdf" % (topStr, baseFolder), shell=True)
+    subprocess.run("cp output/greek/no_split/%s/textsOnlyTopWords/9_group/tSNE/Word_Groupings_tSNE_2D_labels.pdf %swordUse/wordGroups.pdf" % (topStr, baseFolder), shell=True)
 
-    subprocess.run("cp output/greek/no_split/%s+p/textsOnlyTopWords/9_group/images/dhct.pdf %swordUse/eightUp_9Group.pdf" % (topStr, baseFolder), shell=True)
-    subprocess.run("cp output/greek/no_split/%s+p/textsOnlyTopWords/pos_group/images/dhct.pdf %swordUse/eightUp_posGroup.pdf" % (topStr, baseFolder), shell=True)
+    subprocess.run("cp output/greek/no_split/%s/textsOnlyTopWords/9_group/images/dhct.pdf %swordUse/eightUp_9Group.pdf" % (topStr, baseFolder), shell=True)
+    subprocess.run("cp output/greek/no_split/%s/textsOnlyTopWords/pos_group/images/dhct.pdf %swordUse/eightUp_posGroup.pdf" % (topStr, baseFolder), shell=True)
 
 # create each of the folders in a list if they do not exist yet
 def createFolders(folders, baseFolder):
@@ -768,6 +915,7 @@ def createFolders(folders, baseFolder):
 SIM_METRICS = [
     ("jensen-shannon", "Jensen-Shannon"),
     ("burrowsdelta", "Burrows' Delta"),
+    ("minmax", "Min-Max"),
     ("cityblock", "Manhattan"),
     ("canberra", "Canberra"),
     ("cosine", "Cosine"),
@@ -784,7 +932,6 @@ def gatherFilesFull(topStr, topNum, comparableTopStr, comparableNum, poetryNum):
         "data",
         "genre",
         "metric",
-        "metric/nonThuc",
         "metric/extraInfo",
         "century",
         "century/extraInfo",
@@ -794,9 +941,8 @@ def gatherFilesFull(topStr, topNum, comparableTopStr, comparableNum, poetryNum):
     ]
     createFolders(folders, baseFolder)
 
-
-    # Get author and book counts for our languages for the data section
-    getAuthorBookCounts(baseFolder)
+    # Get info for the data section
+    getDataInfo(topStr, baseFolder)
 
     # Get info for approach section
     getWordUseInfo(topStr, baseFolder)
@@ -804,22 +950,20 @@ def gatherFilesFull(topStr, topNum, comparableTopStr, comparableNum, poetryNum):
     # Get genre info
     getGenreInfo(topStr, baseFolder)
     # Gather 4up tsne charts for standard data and data normalized by genre
-    subprocess.run("cp output/greek/no_split/%s+p/Authors/tSNE/info_no_labels_4Up.pdf %sgenre/groupings.pdf" % (topStr, baseFolder), shell=True)
-    subprocess.run("cp output/greek/no_split/%s+p/Books/tSNE/outliers4up.pdf %sgenre/bookOutliers.pdf" % (topStr, baseFolder), shell=True)
-    subprocess.run("cp output/greek/no_split/%s+p_allNorm/Authors/tSNE/info_no_labels_4Up.pdf %sgenre/groupings_norm.pdf" % (topStr, baseFolder), shell=True)
+    # Grab this from the best metric
+    subprocess.run("cp output/greek/no_split/%s/Authors/tSNE/info_no_labels_4Up.pdf %sgenre/groupings.pdf" % (topStr, baseFolder), shell=True)
+    subprocess.run("cp output/greek/no_split/%s/Books/tSNE/outliers4up.pdf %sgenre/bookOutliers.pdf" % (topStr, baseFolder), shell=True)
 
     # Get book tsne charts
-    subprocess.run("cp output/greek/no_split/%s+p/Books/tSNE/tSNE_2D_no_labels.pdf %sgenre/books_tSNE_no_labels.pdf" % (topStr, baseFolder), shell=True)
-    subprocess.run("cp output/greek/no_split/%s+p/Books/tSNE/tSNE_2D_labels.pdf %sgenre/books_tSNE_labels.pdf" % (topStr, baseFolder), shell=True)
+    # Grab this from the best metric
+    subprocess.run("cp output/greek/no_split/%s/Books/tSNE/tSNE_2D_no_labels.pdf %sgenre/books_tSNE_no_labels.pdf" % (topStr, baseFolder), shell=True)
+    subprocess.run("cp output/greek/no_split/%s/Books/tSNE/tSNE_2D_labels.pdf %sgenre/books_tSNE_labels.pdf" % (topStr, baseFolder), shell=True)
     # To get a look at these, run python3 visualizeBooks
 
 
     # Get info for standard and normalized by poetry
-    # makeMLTable("output/greek/no_split/%s/dataPreds/" % (topStr), False, "%sgenre/ml_table.tex" % baseFolder)
-    # makeMLTable("output/greek/no_split/%s_allNorm/dataPreds/" % (topStr), True, "%sgenre/ml_table_norm.tex" % baseFolder)
-    makeMLTable("output/greek/no_split/%s+p/dataPreds/" % (topStr), False, "%sgenre/ml_table+p.tex" % baseFolder)
-    # makeMLTable("output/greek/no_split/%s+p_allNorm/dataPreds/" % (topStr), True, "%sgenre/ml_table+p_norm.tex" % baseFolder)
-
+    makeMLTable("output/greek/no_split/%s/dataPreds/" % (topStr), False, "%sgenre/ml_table.tex" % baseFolder)
+    # makeMLTable("output/greek/no_split/%s+p/dataPreds/" % (topStr), False, "%sgenre/ml_table+p.tex" % baseFolder)
 
     # =========================
 
@@ -828,12 +972,6 @@ def gatherFilesFull(topStr, topNum, comparableTopStr, comparableNum, poetryNum):
     # -----------
     # Metric
     getMetricInfo(topStr, comparableTopStr, topNum, poetryNum, comparableNum, SIM_METRICS, baseFolder)
-    subprocess.run("cp output/greek/no_split/%s+p/nonnusThucCompare/metric_burrowsdelta_full_norm_3.pdf %smetric/nonThuc/burrowsdelta_full.pdf" % (topStr, baseFolder), shell=True)
-    subprocess.run("cp output/greek/no_split/%s+p/nonnusThucCompare/metric_burrowsdelta_3.pdf %smetric/nonThuc/burrowsdelta.pdf" % (topStr, baseFolder), shell=True)
-    subprocess.run("cp output/greek/no_split/%s+p/nonnusThucCompare/metric_canberra_3.pdf %smetric/nonThuc/canberra.pdf" % (topStr, baseFolder), shell=True)
-    subprocess.run("cp output/greek/no_split/%s+p/nonnusThucCompare/metric_cityblock_3.pdf %smetric/nonThuc/cityblock.pdf" % (topStr, baseFolder), shell=True)
-    subprocess.run("cp output/greek/no_split/%s+p/nonnusThucCompare/metric_cosine_3.pdf %smetric/nonThuc/cosine.pdf" % (topStr, baseFolder), shell=True)
-    subprocess.run("cp output/greek/no_split/%s+p/nonnusThucCompare/metric_jensen-shannon_3.pdf %smetric/nonThuc/jensen-shannon.pdf" % (topStr, baseFolder), shell=True)
 
     makeMetricInternalTables("", topStr, SIM_METRICS, baseFolder)
     makeMetricInternalTables("", topStr + "+p", SIM_METRICS, baseFolder)
@@ -855,7 +993,8 @@ def gatherFilesFull(topStr, topNum, comparableTopStr, comparableNum, poetryNum):
     utils.safeWrite("%scentury/century_pvals+p.txt" % baseFolder, "\n".join(pvalOutput))
 
     # -------------------------
-    subprocess.run("cp output/greek/no_split/%s+p/jensen-shannon/metric/Authors/sims.txt %swordUse/authorSims.txt" % (topStr, baseFolder), shell=True)
+    # Grab this from the best metric
+    subprocess.run("cp output/greek/no_split/%s/jensen-shannon/metric/Authors/sims.txt %swordUse/authorSims.txt" % (topStr, baseFolder), shell=True)
 
     fourCenturiesTables(topStr, SIM_METRICS, baseFolder)
 

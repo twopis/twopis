@@ -145,6 +145,32 @@ def compSimsBurrowsDelta(data, ignoreIndex=-1):
     dists = norm*dist.squareform(dist.pdist(normed_data, 'cityblock'))
     return 1 - dists
 
+# compute minmax similairty
+def compSimsMinMax(data, ignoreIndex=-1):
+    if not(ignoreIndex == -1):
+        data = removeIndex(data, ignoreIndex)
+
+    data = np.array(data)
+    data_len = len(data)
+    sims = np.zeros([data_len, data_len])
+
+    for i in range(0, data_len):
+        for j in range(i, data_len):
+            if (i == j):
+                sims[i, j] = 1
+                continue
+
+            max = np.sum(np.maximum(data[i], data[j]))
+            min = np.sum(np.minimum(data[i], data[j]))
+            if (max == 0):
+                minmax = 0
+            else:
+                minmax = min/max
+
+            sims[i, j] = minmax
+            sims[j, i] = minmax
+    return sims
+
 # Compute Jensen-Shannon Similarity
 def compSimsJS(precomp, ignoreIndex=-1):
     N = len(precomp)
@@ -939,8 +965,22 @@ def printAndVizSimData(itemVsItemSims, useBeta, betaParams, typeName, saveDir):
         sim_cen_no_genre_diff = np.copy(sim_cen)
         for pair in sim_cen_no_genre_diff:
             pair[0] = np.around(pair[0])
+        print("    Starting comparison overall... ", end="", flush=True)
         graphUtils.centuryComparisonOverall(sim_cen_no_genre_diff, sim_cen_y, sim_cen_names, saveOutput, saveDir)
+        print("done")
+        print("    Starting comparison by genre... ", end="", flush=True)
         graphUtils.centuryComparisonByGenre(sim_cen, sim_cen_y, sim_cen_names, saveOutput, saveDir)
+        print("done")
+        print("    Starting rainclouds... ", end="", flush=True)
+        try:
+            graphUtils.centuryComparisonByGenre(sim_cen, sim_cen_y, sim_cen_names, saveOutput, saveDir, violin=True)
+        except:
+            print("error making violin...", end="", flush=True)
+        try:
+            graphUtils.centuryComparisonByGenre(sim_cen, sim_cen_y, sim_cen_names, saveOutput, saveDir, raincloud=True)
+        except:
+            print("error making raincloud...", end="", flush=True)
+        print("done")
 
         # Save the range of similarities for the graphs
         minSim = 1
@@ -961,22 +1001,6 @@ def printAndVizSimData(itemVsItemSims, useBeta, betaParams, typeName, saveDir):
         simRangeOutput.append("Max: %s (%.6f)" % (maxName, maxSim))
         simRangeOutput.append("Min: %s (%.6f)" % (minName, minSim))
         utils.safeWrite(saveDir+"simRange.txt", "\n".join(simRangeOutput))
-
-
-
-    if useBeta:
-        # display histogram of similarities
-        graphUtils.dataHistogramWithBeta(raw_sims, a, b, saveOutput, saveDir, "similarityHistogram")
-        if (typeName == "Books"):
-            graphUtils.dataHistogramWithBeta(raw_sims_da, a_da, b_da, saveOutput, saveDir, "similarityHistogramDifferentAuthor")
-            graphUtils.dataHistogramWithBeta(raw_sims_sa, a_sa, b_sa, saveOutput, saveDir, "similarityHistogramSameAuthor")
-    else:
-        # display histogram of similarities with no beta info
-        graphUtils.dataHistogram(raw_sims, saveOutput, saveDir, "similarityHistogram")
-        if (typeName == "Books"):
-            graphUtils.dataHistogram(raw_sims_da, saveOutput, saveDir, "similarityHistogramDifferentAuthor")
-            graphUtils.dataHistogram(raw_sims_sa, saveOutput, saveDir, "similarityHistogramSameAuthor")
-
 
 # ===========================================================
 # ======== Aggregate features and run sort/visualize ========
@@ -1164,6 +1188,19 @@ SIMILARITY_METRICS = [
         "addToJSON": True,
     },
     {
+        "name": "minmax",
+        "compute": compSimsMinMax,
+        "useBeta": False,#True,#
+        "symmetric": True,
+        "useRemainder": False,
+        "useSmoothing": False,
+        "precompute": precomputeDefault,
+        "precomputeSmooth": precomputePlusOne,
+        "evaluateMetric": True,
+        "makeGraphs": False,
+        "addToJSON": True,
+    },
+    {
         "name": "burrowsdelta",
         "compute": compSimsBurrowsDelta,
         "useBeta": False,#True,#
@@ -1179,7 +1216,7 @@ SIMILARITY_METRICS = [
 ]
 
 # Run various similarity calculations
-def calculateSimilarity(dataSplit, top, subsetSize, addPoetry, simCompare, includeBooks, saveDirBase):
+def calculateSimilarity(dataSplit, top, subsetSize, simCompare, includeBooks, saveDirBase):
     topName, _, _ = top
 
     # Load authors and books
@@ -1248,5 +1285,5 @@ if __name__ == "__main__":
         newTop = (name, topWords, poetryWords)
         saveDir = mp.getSaveDir(mp.language, mp.languageInfo, splitParameter)
 
-        calculateSimilarity(splitParameter, newTop, subsetSize, mp.addPoetry, compSimOptions, includeBooks, saveDir)
+        calculateSimilarity(splitParameter, newTop, subsetSize, compSimOptions, includeBooks, saveDir)
         print("======================")

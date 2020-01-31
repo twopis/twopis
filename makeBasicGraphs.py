@@ -43,25 +43,6 @@ def visualizeItemData(data, target, names, authornames, typeName, saveDir):
     testSet = graphUtils.Dataset([], [])
     testNames = []
     saveOutput = True
-    oneThree = False
-
-    pcaDir = "pca/"
-
-    # Do PCA
-    for includeNames in [True, False]:
-        try:
-            graphUtils.pca2Viz(dataSet, names, includeNames, saveOutput, saveDir + pcaDir, oneThree)
-        except IndexError:
-            print("Could not run visualization of PCA for 2: not enough dimensions in PCA.")
-        if (False):
-            try:
-                graphUtils.pca3Viz(dataSet, names, includeNames, False     , saveDir + pcaDir)
-            except IndexError:
-                print("Could not run visualization of PCA for 3: not enough dimensions in PCA.")
-        try:
-            graphUtils.pca4Viz(dataSet, names, includeNames, saveOutput, saveDir + pcaDir)
-        except IndexError:
-            print("Could not run visualization of PCA for 4: not enough dimensions in PCA.")
 
     perplexity = 20.0
 
@@ -108,10 +89,10 @@ def visualizeItemData(data, target, names, authornames, typeName, saveDir):
             #print("Precalculateds loaded")
 
             targets = []
-            targets.append({"name":"_", "target":preY!=30, "labels":["Demosthenes", "Others"]}) # Demosthenes
-            targets.append({"name":"_", "target":preY!=55, "labels":["Isocrates", "Others"]}) # Isocrates
-            targets.append({"name":"_", "target":preY!=91, "labels":["Xenophon", "Others"]}) # Xenophon
-            targets.append({"name":"_", "target":preY!=76, "labels":["Plato", "Others"]}) # Plato
+            targets.append({"name":"_", "target":preY!=30, "labels":["Demosthenes", "Others"], "outlierName": "Demos.speec.59", "prettyName": "Speech 59"}) # Demosthenes .15
+            targets.append({"name":"_", "target":preY!=55, "labels":["Isocrates", "Others"], "outlierName": "Isocr.speec.21", "prettyName": "Speech 21"}) # Isocrates .10
+            targets.append({"name":"_", "target":preY!=91, "labels":["Xenophon", "Others"], "outlierName": "Xenop.hunti.1", "prettyName": "Cynegeticus"}) #  Xenophon .helle.7
+            targets.append({"name":"_", "target":preY!=76, "labels":["Plato", "Others"], "outlierName": "Plato.menex.1", "prettyName": "Menexenus"}) # Plato .laws.8
             #targets.append(genre.labelList[]())
 
             dataSet = graphUtils.Dataset(tsneX, targets)
@@ -544,12 +525,13 @@ def keyAuthorComparisonWithImportance(authors, books, baseSaveDir, splitParam, t
         name, c = item
         # "Aristotle_Pindar" in name or
 
-        if ("AeliusAristides_Demosthenes" in name or
-            "DioChrysostom_Plato" in name):
+        #"AeliusAristides_Demosthenes", "DioChrysostom_Plato"
+        if ("ApolloniusRhodius_QuintusSmyrnaeus" in name or
+            "DioChrysostom_Xenophon" == name):
             res.append((name, "-", 1 + c[-1] - np.array(c)))
 
         # Lowest of our top authors
-        if ("DioChrysostom_Plato" in name):
+        if ("DioChrysostom_Xenophon" == name):
             targetSim = c[-1]
 
     # add median
@@ -995,9 +977,6 @@ def basicGraphs(dataSplit, top, saveDirBase):
 
     print("  Histogram comparison...")
     histogramComparison(authors, books, saveDir, topWords)
-
-    print("  Key author histograms...")
-    keyAuthorComparison(authors, books, saveDir, topWords,)
 
     print("  Key author word importance...")
     keyAuthorComparisonWithImportance(authors, books, saveDir, dataSplit, topWords)
