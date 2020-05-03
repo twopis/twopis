@@ -11,7 +11,7 @@
 #  Created by Laurens van der Maaten on 20-12-08.
 #  Copyright (c) 2008 Tilburg University. All rights reserved.
 #
-#  Modified by [REDACTED] for Python 3 compatibility in Fall 2017.
+#  Modified by Grant Storey for Python 3 compatibility in Fall 2017.
 
 import numpy as Math
 import pylab as Plot
