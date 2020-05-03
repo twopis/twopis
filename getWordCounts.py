@@ -68,12 +68,18 @@ def selectSubset(tokens, subsetSize):
     #print("%d, %d" % (len(resTokens), subsetSize))
     return resTokens
 
+# Convert from "texts/..." to "textCounts/..."
+def convertToTextCounts(filename):
+    return "textCounts/" + filename[6:]
+
 # Load all of the texts. if splitParameter is not -1, divide each author's
 # work in 2, putting the first half of each 2*splitParameter words in one
 # "author" and the second half in another "author"
-def loadTexts(splitParameter, subsetSize, textLocation, language, saveDir):
+def loadTexts(splitParameter, subsetSize, textLocation, language, saveDir, useTextCounts):
     useSplitParam = splitParameter != -1
 
+    if useTextCounts:
+        textLocation = convertToTextCounts(textLocation)
     available = utils.getContent(textLocation + "available.json", True)
     authors = []
     allWorks = []
@@ -105,7 +111,10 @@ def loadTexts(splitParameter, subsetSize, textLocation, language, saveDir):
             allWorks.append(w)
             # if authorName == "Arrian" and w["name"] != "Anabasis":
             #     continue
-            t = utils.Text(w["location"])
+            location = w["location"]
+            if useTextCounts:
+                location = convertToTextCounts(location)
+            t = utils.Text(location)
 
             if useSplitParam:
                 a1.addWork(t)
@@ -117,21 +126,40 @@ def loadTexts(splitParameter, subsetSize, textLocation, language, saveDir):
             # For each book, process all of its tokens, count them,
             # add them to this author.
             for b in t.books:
-                rawTokens = re.sub(r'\.,;:᾽῾\'', "", b.bookText).split(" ")
                 tokens = []
-                for token in rawTokens:
-                    if language == "Greek":
-                        token = preprocessTokenGreek(token)
+                if not(useTextCounts):
+                    rawTokens = re.sub(r'\.,;:᾽῾\'', "", b.bookText).split(" ")
+                    for token in rawTokens:
+                        if language == "Greek":
+                            token = preprocessTokenGreek(token)
 
-                        token = utils.transformElided(token)
-                    if language == "Icelandic":
-                        token = preprocessTokenIcelandic(token)
+                            token = utils.transformElided(token)
+                        if language == "Icelandic":
+                            token = preprocessTokenIcelandic(token)
 
-                    if (token == ""):
-                        continue
+                        if (token == ""):
+                            continue
 
+                        tokens.append(token)
+                else:
+                    tokenCounts = b.bookTokenCounts
+                    for token in tokenCounts:
+                        cleanToken = token
+                        if language == "Greek":
+                            cleanToken = preprocessTokenGreek(cleanToken)
 
-                    tokens.append(token)
+                            cleanToken = utils.transformElided(cleanToken)
+                        if language == "Icelandic":
+                            cleanToken = preprocessTokenIcelandic(cleanToken)
+
+                        if (cleanToken == ""):
+                            continue
+
+                        # Add token once per each count. Bit of a hack and the
+                        # text will end up out of order, but since the paper
+                        # doesn't consider word order this should be fine.
+                        for i in range(tokenCounts[token]):
+                            tokens.append(cleanToken)
 
                 b.tokens = tokens
                 books.append(b)
@@ -649,10 +677,10 @@ def loadWCData(saveDir, dataSplit, topName, type=""):
 # ===========================================================
 
 # load texts and basic count info
-def getWordCountInfo(dataSplit, subsetSize, language):
+def getWordCountInfo(dataSplit, subsetSize, language, useTextCounts):
     textLocation = mp.languageInfo[language]["textLocation"]
     saveDir = mp.languageInfo[language]["saveDir"]
-    authors, books = loadTexts(dataSplit, subsetSize, textLocation, language, saveDir)
+    authors, books = loadTexts(dataSplit, subsetSize, textLocation, language, saveDir, useTextCounts)
 
     print("Getting token counts for all texts...")
     allTokenCounts, poetryTokenCounts = getAllTokenCounts(authors, saveDir)
@@ -706,5 +734,5 @@ if __name__ == "__main__":
         name, topWords, poetryWords, subsetSize, splitParameter, includeBooks, includeGraphs, _, wordToPOS = top
         newTop = (name, topWords, poetryWords)
         saveDir = mp.getSaveDir(mp.language, mp.languageInfo, splitParameter)
-        authors, books, tokenInfo, poetryTokenInfo = getWordCountInfo(splitParameter, subsetSize, mp.language)
+        authors, books, tokenInfo, poetryTokenInfo = getWordCountInfo(splitParameter, subsetSize, mp.language, False)
         getWordCounts(authors, books, tokenInfo, poetryTokenInfo, newTop, mp.language, saveDir)

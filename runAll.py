@@ -15,6 +15,7 @@ from gatherFiles import gatherFilesFull
 from wordGroupTests import wordGroupTests
 import mainParams as mp
 
+USE_TEXT_COUNTS = False
 
 for language in ["Greek", "English", "Icelandic"]:
     print("Language: %s" % language)
@@ -24,7 +25,7 @@ for language in ["Greek", "English", "Icelandic"]:
     # Precomputation to save computing time: since all currently used options
     # have a subsetSize and splitParamter of -1, we can calculate this info once
     # and use it many times.
-    authors, books, tokenInfo, poetryTokenInfo = getWordCountInfo(-1, -1, language)
+    authors, books, tokenInfo, poetryTokenInfo = getWordCountInfo(-1, -1, language, USE_TEXT_COUNTS)
 
     print("Getting top word overlap over time info...")
     calcTopWordOverlapOverTime(language)
@@ -62,8 +63,12 @@ for language in ["Greek", "English", "Icelandic"]:
             predictCategories(splitParameter, newTop, saveDir)
             print("====================================")
             print("====================================")
-            print("Getting Word Lists...")
-            printKeyWords(splitParameter, newTop, subsetSize, language, saveDir)
+
+            if not(USE_TEXT_COUNTS):
+                # Words in context doesn't make sense when we are using only
+                # the word count per book.
+                print("Getting Word Lists...")
+                printKeyWords(splitParameter, newTop, subsetSize, language, saveDir)
 
             # This is a massive calculation that should only be done for the
             # one set we care about.

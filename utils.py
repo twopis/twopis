@@ -181,6 +181,10 @@ class Book:
         self.author = author
         self.bookNumber = raw["bookNumber"]
         self.bookText = raw["bookText"]
+        btc = {}
+        if "bookTokenCounts" in raw:
+            btc = raw["bookTokenCounts"]
+        self.bookTokenCounts = btc
         self.numTokens = None
         self.tokens = []
 

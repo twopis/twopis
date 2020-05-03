@@ -101,7 +101,7 @@ def parseIcelandic():
     print("Done.")
 
 
-    # Optionally count the characters inthe corpus. This is done to find weird
+    # Optionally count the characters in the corpus. This is done to find weird
     # Unicode artifacts to make sure it gets removed in the cleaning step.
     countChars = False#True#
     if countChars:
