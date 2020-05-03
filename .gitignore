@@ -6,6 +6,9 @@ rawTexts/english/ME/*
 rawTexts/icelandic/textar/*
 rawTexts/icelandic/icepahc-v0.9/*
 rawTexts/icelandic/MIM/*
+textCounts/greek/*
+textCounts/english/*
+textCounts/icelandic/*
 texts/*/*
 output/*
 **/.DS_Store
